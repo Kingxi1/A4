@@ -29,16 +29,16 @@ class Client:
             addr = (self.host, self.port)
             
         retries = 0
-        while retries < self.max_retries:
+        while retries < MAX_RETRIES:
             try:
                 self.sock.sendto(msg.encode(), addr)
                 self.sock.settimeout(self.timeout)
-                data, _ = self.sock.recvfrom(1024)
+                data, _ = self.sock.recvfrom(BUFFER_SIZE)
                 return data.decode()
             except socket.timeout:
                 retries += 1
-                self.timeout = min(self.timeout * 2, 16.0)
-                print(f"Timeout, retry {retries}/{self.max_retries}")
+                self.timeout = min(self.timeout * 2, MAX_TIMEOUT)
+                print(f"Timeout, retry {retries}/{MAX_RETRIES}")
                 time.sleep(RETRY_DELAY)
             except socket.error as e:
                 retries += 1
@@ -159,11 +159,7 @@ def main():
     
     c = Client(host, port)
     try:
-        with open(list_file, 'r') as f:
-            for line in f:
-                fname = line.strip()
-                if fname:
-                    c.get_file(fname)
+        c.get_files(list_file)
     finally:
         c.close()
 
