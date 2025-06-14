@@ -6,6 +6,26 @@ class Client:
         self.host = host
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.timeout = 1.0
+        self.max_retries = 5
+
+    def send_recv(self, msg, addr=None):
+        if addr is None:
+            addr = (self.host, self.port)
+            
+        retries = 0
+        while retries < self.max_retries:
+            try:
+                self.sock.sendto(msg.encode(), addr)
+                self.sock.settimeout(self.timeout)
+                data, _ = self.sock.recvfrom(1024)
+                return data.decode()
+            except socket.timeout:
+                retries += 1
+                self.timeout = min(self.timeout * 2, 16.0)
+                print(f"Timeout, retry {retries}/{self.max_retries}")
+                
+        raise Exception("Too many retries")
         
     def get_file(self, fname):
         print(f"Getting {fname}")
