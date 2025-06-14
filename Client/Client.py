@@ -24,11 +24,10 @@ class Client:
         self.timeout = INITIAL_TIMEOUT
         self.buffer = bytearray(BUFFER_SIZE)
 
-    def send_recv(self, msg, addr=None):
+    def send_recv(self, msg, addr=None, retries=0):
         if addr is None:
             addr = (self.host, self.port)
             
-        retries = 0
         while retries < MAX_RETRIES:
             try:
                 self.sock.sendto(msg.encode(), addr)
@@ -139,12 +138,24 @@ class Client:
                 return True
                 
             
-            except Exception as e:
-                print(f"Error: {e}")
+            except ValueError as e:
+                print(f"Error parsing response: {e}")
                 return False
         except Exception as e:
             print(f"Error: {e}")
             return False
+        
+
+    def get_files(self, list_file):
+        with open(list_file, 'r') as f:
+            for line in f:
+                fname = line.strip()
+                if fname:
+                    try:
+                        self.get_file(fname)
+                    except Exception as e:
+                        print(f"Error: {e}")
+
     def close(self):
         self.sock.close()
 

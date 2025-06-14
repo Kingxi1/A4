@@ -54,6 +54,7 @@ class FileThread(threading.Thread):
                             elif req[0] == "FILE" and req[2] == "CLOSE":
                                 resp = f"FILE {self.fname} CLOSE_OK"
                                 self.sock.sendto(resp.encode(), addr)
+                                time.sleep(0.1)
                                 return  # Successfully completed, exit thread
                                 
                         except socket.error as e:
