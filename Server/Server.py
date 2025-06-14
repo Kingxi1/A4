@@ -3,11 +3,15 @@ import sys
 import os
 import threading    
 import base64
+from threading import Lock
 
+# Performance optimization settings
 BUFFER_SIZE = 8192  # Increase buffer size
 CHUNK_SIZE = 4096   # Increase chunk size
-MAX_RETRIES = 5     # Maximum retry attempts
-TIMEOUT = 1.0       
+MAX_RETRIES = 3     # Maximum retry attempts
+RETRY_DELAY = 0.1   # Retry delay (seconds)
+thread_count = 0    # Current thread count
+thread_lock = Lock()  # Thread count lock    
 
 
 class FileThread(threading.Thread):
@@ -18,39 +22,54 @@ class FileThread(threading.Thread):
         self.fname = fname
         
     def run(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFFER_SIZE)
-        sock.bind(('', self.port))
+        retries = 0
+        while retries < MAX_RETRIES:
+            try:
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFFER_SIZE)
+                self.sock.bind(('', self.port))
         
-        try:
-            with open(self.fname, 'rb') as f:
-                while True:
-                    data, addr = sock.recvfrom(1024)
-                    req = data.decode().split()
+    
+                with open(self.fname, 'rb') as f:
+                    while True:
+                        try:
+                            data, addr = sock.recvfrom(1024)
+                            req = data.decode().split()
                     
-                    if req[0] == "FILE" and req[2] == "GET":
-                        chunk = f.read(CHUNK_SIZE)
-                        if chunk:
-                            # 使用Base64编码传输数据
-                            encoded_data = base64.b64encode(chunk).decode()
-                            sock.sendto(encoded_data.encode(), addr)
-                        else:
-                            # 文件传输完成
-                            sock.sendto("FILE DONE".encode(), addr)
-                    elif req[0] == "FILE" and req[2] == "CLOSE":
-                        break
-                        
-                    elif req[0] == "FILE" and req[2] == "CLOSE":
-                        break
-                       
-                    elif req[0] == "FILE" and req[2] == "CLOSE":
-                        break
-                        
-        except Exception as e:
-            print(f"Error in file transfer: {e}")
-        finally:
-            sock.close()
+                            if req[0] == "FILE" and req[2] == "GET":
+                                start = int(req[4])
+                                end = int(req[6])
+
+                                f.seek(start)
+                                encoded = base64.b64encode(chunk).decode()
+                                
+                                resp = f"FILE {self.fname} OK START {start} END {end} DATA {encoded}"
+                                self.sock.sendto(resp.encode(), addr)
+                                
+                            elif req[0] == "FILE" and req[2] == "CLOSE":
+                                resp = f"FILE {self.fname} CLOSE_OK"
+                                self.sock.sendto(resp.encode(), addr)
+                                return  # Successfully completed, exit thread
+                                
+                        except socket.error as e:
+                            print(f"Socket error in file transfer: {e}")
+                            break
+                            
+            except Exception as e:
+                print(f"Error in file transfer: {e}")
+                retries += 1
+                if retries < MAX_RETRIES:
+                    print(f"Retrying... ({retries}/{MAX_RETRIES})")
+                    time.sleep(RETRY_DELAY)
+                else:
+                    print(f"Max retries reached for {self.fname}")
+            finally:
+                if self.sock:
+                    try:
+                        self.sock.close()
+                    except:
+                        pass
 
 
 
