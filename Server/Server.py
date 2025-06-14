@@ -2,8 +2,12 @@ import socket
 import sys
 import os
 import threading    
+import base64
 
-
+BUFFER_SIZE = 8192  # Increase buffer size
+CHUNK_SIZE = 4096   # Increase chunk size
+MAX_RETRIES = 5     # Maximum retry attempts
+TIMEOUT = 1.0       
 
 
 class FileThread(threading.Thread):
@@ -15,6 +19,8 @@ class FileThread(threading.Thread):
         
     def run(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFFER_SIZE)
         sock.bind(('', self.port))
         
         try:
@@ -24,8 +30,20 @@ class FileThread(threading.Thread):
                     req = data.decode().split()
                     
                     if req[0] == "FILE" and req[2] == "GET":
-                        # 处理文件请求
-                        pass
+                        chunk = f.read(CHUNK_SIZE)
+                        if chunk:
+                            # 使用Base64编码传输数据
+                            encoded_data = base64.b64encode(chunk).decode()
+                            sock.sendto(encoded_data.encode(), addr)
+                        else:
+                            # 文件传输完成
+                            sock.sendto("FILE DONE".encode(), addr)
+                    elif req[0] == "FILE" and req[2] == "CLOSE":
+                        break
+                        
+                    elif req[0] == "FILE" and req[2] == "CLOSE":
+                        break
+                       
                     elif req[0] == "FILE" and req[2] == "CLOSE":
                         break
                         
@@ -45,6 +63,8 @@ def main():
         
     port = int(sys.argv[1])
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUFFER_SIZE)
     sock.bind(('', port))
     
     print(f"Server listening on port {port}")
