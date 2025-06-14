@@ -1,5 +1,6 @@
 import socket
 import sys
+import os
 
 def main():
     if len(sys.argv) != 2:
@@ -15,6 +16,17 @@ def main():
     while True:
         try:
             data, addr = sock.recvfrom(1024)
+            req = data.decode().split()
+            
+            if req[0] == "DOWNLOAD":
+                fname = req[1]
+                if os.path.exists(fname):
+                    size = os.path.getsize(fname)
+                    resp = f"OK SIZE {size}"
+                    sock.sendto(resp.encode(), addr)
+                else:
+                    resp = f"ERR {fname} NOT_FOUND"
+                    sock.sendto(resp.encode(), addr)
             print(f"Received from {addr}: {data.decode()}")
         except Exception as e:
             print(f"Error: {e}")
