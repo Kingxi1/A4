@@ -22,8 +22,7 @@ class Client:
         self.sock.close()
 
 
-def main():
-    
+def main():  
     if len(sys.argv) != 4:
         print("Usage: python UDPclient.py <host> <port> <file_list>")
         return
